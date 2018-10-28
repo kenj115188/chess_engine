@@ -9,7 +9,8 @@
     # Maybe could add an option for playing human-human, human-AI or AI-AI,
     # current only human-AI
     # Will add Random, MinMax and alfa/beta pruning AI algorthms
-    # add evaluate_board function
+    # edit AI
+    # perfect evaluate_board function
     # add special moves
 
 ###############################################################################
@@ -74,9 +75,14 @@
     # Print move in chees representation
     # Return to game loop
 
-# AI loop:
+# AI function, choose one of the possible moves in a given position
+def AI_algorithm():
+    automated = True
+    for move in current_game.player_possibles():
+        pass
+    current_game.evaluate_board()
+    automated = False
     # Ask for piece possible moves
-    # Prune the possible moves against the board
     # Choose a move using the selected algorithm
     # Return choosen move
 
@@ -102,6 +108,7 @@ automated = False
 showing_possibles = False
 showing_moves = []
 #set the defaults for globals
+AI_plays_with = b
 
 #convert xy coordinate to conventional notation
 def xy_to_letter(coordinate_list):
@@ -315,6 +322,7 @@ class game:
                                 print(self.board[x][y].symbol[1],end="")
                 except: print(" ",end="")
 #leave a blank space for empty cells, which raise an error
+
             print(" │ ")
 #print the row number at the end of the row itself, and prints a different row
 #for the last iteration
@@ -323,6 +331,34 @@ class game:
 #add a delimiting line after each row
         print ("    A   B   C   D   E   F   G   H")
 #a representation of the columns, written under them
+
+#return white or balck depending on who must move
+    def who_plays(self):
+        if self.counter % 2 == 0:
+#% is the remainder operator
+            return w
+        elif self.counter % 2 == 1:
+            return b
+
+#return all the legal moves for a given player
+    def player_possibles(self):
+        self.player_possibles = []
+        player_color = self.who_plays()
+        movable_pieces = []
+        for y in range(0,8):
+            for x in range(0,8):
+                current_square = self.read([x,y])
+                if current_square != 0:
+                    if current_square.piece_color == player_color:
+#a move is legal only from a square where I have a piece
+                        current_square.calculate_piece_possibles()
+                        for destination in current_square.piece_possibles:
+                            move =  [[x,y],destination]
+                            self.player_possibles.append(move)
+#create a list of moves
+#a move is itself a list [starting_position,arriving_position]
+#a position is a list [x,y]
+        return self.player_possibles
 
 ########## All the classes for the different figures of the game
 #this class is common to all pieces and sets shared properties
@@ -642,12 +678,13 @@ class king(piece):
 game1 = game()
 current_game.initialise()
 current_game.show_board()
+current_game.player_possibles()
 #current_game.empty_board()
 #current_game.show_board()
 #current_game.add_piece(c,w,[6,2])
 #current_piece = current_game.board[6][2]
 #current_piece.show_piece_possibles()
-print("\nboard evaluation: "+str(current_game.evaluate_board()))
+#print("\nboard evaluation: "+str(current_game.evaluate_board()))
 #print(current_piece.position)
 #print(current_piece.name)
 #current_piece.calculate_piece_possibles()
