@@ -4,111 +4,117 @@
     # Represents the current board status when asked
     # It is OO for didactic purposes
 
+# General outline of the game representation:
+    # The board is represented as a 8*8 matrix (list of lists) of game class
+        # The first coordinate is the column, the second the row
+    # An empty cell has value 0
+    # A cell with a piece contains an object of the appropriate class
+
 # Notes:
     # Maybe could add an option for specifying a particular pieces arrangement
     # Maybe could add an option for playing human-human, human-AI or AI-AI,
     # current only human-AI
     # Will add Random, MinMax and alfa/beta pruning AI algorthms
-    # edit AI
     # perfect evaluate_board function
     # add special moves
-
-###############################################################################
-
-# Pseudocode for the general structure of the programme
-
-# Print splash screen
-# Main loop:
-    # Ask for user input
-    # Process the input and do one of the following:
-        # Select AI alogrithm
-            # Algorithm selection loop
-        # Start a new game:
-            # Control loop
-        # List saved games and allows user to resume one:
-            # Control loop
-        # Quit
-        # Print an error and restarts the main loop
-
-# Control loop:
-    # Has AI algorithm been selected?
-        # YES:
-            # Continue the control loop
-        # NO:
-            # Print an error
-            # Enter algorithm selection loop
-    # Ask for user input
-    # Process the input and do one of the following:
-        # Print current checkboard status
-        # Operate a move on the board:
-            # Game loop
-        # Return to main loop
-        # Print an error and restart the control loop
-
-# Algorithm selection loop:
-    # Ask for user input
-    # Process the input and do one of the following:
-        # Select the choosen algorthm
-        # Print an error and restart the algorthm selection loop
-        # Return to main menu
-
-# Game loop:
-    # Check if the game has ended:
-        # Print result
-        # return to control loop
-    # Check who can move and enter the appropriate loop
-        # User move loop
-        # AI move loop
-
-# User moves loop:
-    # Ask the user to insert a move or quit to control loop
-    # Input is converted in the internal representation
-    # Assert move validity
-    # Operate the move on the board
-    # Return to game loop
-
-# AI moves loop:
-    # AI loop produces an internal move representation
-    # Assert move validity
-    # Operate the move on the board
-    # Convert AI move in chess representation
-    # Print move in chees representation
-    # Return to game loop
-
-# AI function, choose one of the possible moves in a given position
-def AI_algorithm():
-    automated = True
-    for move in current_game.player_possibles():
-        pass
-    current_game.evaluate_board()
-    automated = False
-    # Ask for piece possible moves
-    # Choose a move using the selected algorithm
-    # Return choosen move
-
-###############################################################################
-# General outline of the game representation:
-    # The board is represented as a 8*8 matrix (list of lists) of game class
-        # The first coordinate is the row, the second the column
-    # An empty cell has value 0
-    # A cell with a piece contains an object of the appropriate class
-    # Maybe in future a way for creating a particular pieces arrangement could
-    # be implemented
-
-###############################################################################
+    # add algorithms
+    # add UI
 
 letter_xy_table = {"A":0,"B":1,"C":2,"D":3,"E":4,"F":5,"G":6,"H":7}
 xy_letter_table = {0:"A",1:"B",2:"C",3:"D",4:"E",5:"F",6:"G",7:"H"}
 #set a corrispondece x_value:row_name
-w,b = "white","black"
+W,B = "white","black"
 out_of_range = "This value is out of the specified range"
-p,r,c,b,q,k = "pawn","rook","knight","bishop","queen","king"
 #codifies an uniform way for representing an out of range value
+p,r,c,b,q,k = "pawn","rook","knight","bishop","queen","king"
+all_pieces = (p,r,c,b,q,k)
 automated = False
+#is true when an a function is called without user input, skips assertions
 showing_possibles = False
+#enter a variant path in show_board() if called by show_piece_possibles()
 showing_moves = []
-#set the defaults for globals
-AI_plays_with = b
+#initialises the variable for show_piece_possibles()
+
+
+#chose a move between the possible ones, using the given algorithm
+def AI(algorithm):
+    global automated
+    automated = True
+#skip assertions
+    print("I am thinking...")
+#the comparison sense is inverted because the function is called after the move
+#has been done
+#sets the sense of the comparison accordinglu to the palyer who is playing,
+#maximising or minimasing
+    def compare(current_score,best_score):
+        if current_game.who_plays() == W:
+            if current_score < best_score: return True
+            else: return False
+        elif current_game.who_plays() == B:
+            if current_score > best_score: return True
+            else: return False
+        else: raise AssertionError
+
+#choose the best moove considering a depth of 1
+    def greedy():
+        i = 0
+        best_score = 0
+        for move in current_game.player_possibles():
+#go through all the possible moves
+            i += 1
+            current_game.move_piece(move)
+#perform the move on the board
+            current_score = current_game.evaluate_board()
+#evaluate the score after the move
+            if compare(current_score,best_score) or i == 1:
+#update the best score if needed, and in case save the current move as best
+                best_move = move
+                best_score = current_score
+            current_game.undo_move()
+#go to the state of the board previous to moving
+            current_game.read(move[0]).update_position(move[0])
+#moving the piece has update its internal position variable
+#undoing the move I need to reset the position to the current one
+#move[0] is the address of the piece after the undoing
+        return (best_score,best_move)
+
+#return the best move at a given depth+1(0 is considered)
+#check the comments on greedy() for a general explanation of the common
+#features
+    def minmax(depth):
+        i = 0
+        best_score = 0
+        if depth == 0:
+#I am at the final iteration, do a greedy choice
+            return greedy()
+        elif depth > 0:
+#I have to go deeper
+#First part similar to greedy
+            for move in current_game.player_possibles():
+#iterate through all the moves
+                i += 1
+                current_game.move_piece(move)
+#perform the move
+                current_score = minmax(depth-1)[0]
+#this is the iteration: set the score for this move to the score that comes
+#from the greedy choice of the deepest iteretion
+                if compare(current_score,best_score) or i == 1:
+                    best_score = current_score
+                    best_move = move
+                current_game.undo_move()
+                current_game.read(move[0]).update_position(move[0])
+#same of greedy()
+            return (best_score,best_move)
+
+#AI can be called using one of the available algorithms
+    if algorithm == "greedy":
+        selected_move = greedy()
+    elif algorithm == "minmax":
+        selected_move = minmax(3)[1]
+#depth is fixed to a value that takes a reasonable amount of time to run
+    automated = False
+    return selected_move
+
 
 #convert xy coordinate to conventional notation
 def xy_to_letter(coordinate_list):
@@ -119,13 +125,12 @@ def xy_to_letter(coordinate_list):
 #add 1 because cells go from 1-8, not 0-7
         letteral_coordinate = str(x_letter)+str(y+1)
         return letteral_coordinate
-    except:
-        return out_of_range
+    except: return out_of_range
 
 
 #extract x from conventional notation
 def letter_to_x(letter_coordinate):
-    x_letteral = letter_coordinate[1]
+    x_letteral = letter_coordinate[0]
     x_value_string = letter_xy_table[x_letteral]
     x = int(x_value_string)
     assert (0<=x<=7)
@@ -144,19 +149,33 @@ def letter_to_y(letter_coordinate):
 def letter_to_xy(letter_coordinate):
     x = letter_to_x(letter_coordinate)
     y = letter_to_y(letter_coordinate)
-    coordinate_list = [x,y]
+    return [x,y]
 
 #returns the opposite color of the one given
 def opposite_color(color):
-    assert color == w or color == b
-    if color == w: return b
-    elif color == b: return w
+    assert color in (W,B)
+    if color == W: return B
+    elif color == B: return W
 
 
 #set the global variable current game to point to the game in play
 def set_current_game(game):
     global current_game
     current_game = game
+
+#create a list with all valid square names in it
+#needed to check if an user input is a valid move
+def list_all_squares():
+    global all_squares
+    all_squares = []
+    for y in range(0,8):
+        for x in range(0,8):
+            square = xy_to_letter([x,y])
+            if square != out_of_range:
+                all_squares.append(square)
+
+list_all_squares()
+
 
 #the complicated game class, which builts the checkboard
 class game:
@@ -166,7 +185,7 @@ class game:
         for y in range (0,8):
             self.row = []
             for x in range (0,8):
-                self.row.append(0)
+                self.row.append([0])
             self.board.append(self.row)
 #create a counter variable with value 0
         self.counter = 0
@@ -177,48 +196,72 @@ class game:
     def add_piece(self,piece_name,color,coordinate_list):
         x,y = coordinate_list[0],coordinate_list[1]
         if automated == False:
-            assert (piece_name == p or r or c or b or q or k)
-            assert color == w or b
+            assert piece_name in (p,r,c,b,q,k)
+            assert color in (W,B)
             assert 0<=x,y<=7
 #assert input validity if the human is playing
-        if piece_name == p: self.board[x][y] = pawn()
-        elif piece_name == r: self.board[x][y] = rook()
-        elif piece_name == c: self.board[x][y] = knight()
-        elif piece_name == b: self.board[x][y] = bishop()
-        elif piece_name == q: self.board[x][y] = queen()
-        elif piece_name == k: self.board[x][y] = king()
+        if piece_name == p: self.board[x][y].append(pawn())
+        elif piece_name == r: self.board[x][y].append(rook())
+        elif piece_name == c: self.board[x][y].append(knight())
+        elif piece_name == b: self.board[x][y].append(bishop())
+        elif piece_name == q: self.board[x][y].append(queen())
+        elif piece_name == k: self.board[x][y].append(king())
 #add the right object depending on input
-        self.board[x][y].update_position(coordinate_list)
-        self.board[x][y].give_color(color)
+        self.read(coordinate_list).update_position(coordinate_list)
+        self.read(coordinate_list).give_color(color)
+        if automated == False:
+#board is represemted as a list of rows. Rows are a list of squares. Squares
+#are a list of what was in them in each round. The actual element in a square
+#is square[-1]
+#when human performs a move, I need to add an element to each square in order
+#to preserve an equal lenght for all of them
+#this is skipped when building the board, because the function does it
+            for my_x in range(0,8):
+                for my_y in range(0,8):
+                    if len(self.board[x][y])>len(self.board[my_x][my_y]):
+#for each square, if it is shorter than the one where I added the piece, add an
+#element to it
+                        self.board[my_x][my_y].append(self.board
+                                                      [my_x][my_y][-1])
+
 
 #place all pieces in the starting position on the board, creating piece objects
     def initialise(self):
-        self.add_piece(r,w,[0,0])
-        self.add_piece(c,w,[1,0])
-        self.add_piece(b,w,[2,0])
-        self.add_piece(q,w,[3,0])
-        self.add_piece(k,w,[4,0])
-        self.add_piece(b,w,[5,0])
-        self.add_piece(c,w,[6,0])
-        self.add_piece(r,w,[7,0])
+        global automated
+        automated = True
+#avoid checking for unbalanced adding in add_piece
+        self.__init__()
+#put the board in a virgin state
+        self.add_piece(r,W,[0,0])
+        self.add_piece(c,W,[1,0])
+        self.add_piece(b,W,[2,0])
+        self.add_piece(q,W,[3,0])
+        self.add_piece(k,W,[4,0])
+        self.add_piece(b,W,[5,0])
+        self.add_piece(c,W,[6,0])
+        self.add_piece(r,W,[7,0])
         for x in range(0,8):
-            self.add_piece(p,w,[x,1])
-        self.add_piece(r,b,[0,7])
-        self.add_piece(c,b,[1,7])
-        self.add_piece(b,b,[2,7])
-        self.add_piece(q,b,[3,7])
-        self.add_piece(k,b,[4,7])
-        self.add_piece(b,b,[5,7])
-        self.add_piece(c,b,[6,7])
-        self.add_piece(r,b,[7,7])
+            self.add_piece(p,W,[x,1])
+        self.add_piece(r,B,[0,7])
+        self.add_piece(c,B,[1,7])
+        self.add_piece(b,B,[2,7])
+        self.add_piece(q,B,[3,7])
+        self.add_piece(k,B,[4,7])
+        self.add_piece(b,B,[5,7])
+        self.add_piece(c,B,[6,7])
+        self.add_piece(r,B,[7,7])
         for x in range(0,8):
-            self.add_piece(p,b,[x,6])
+            self.add_piece(p,B,[x,6])
+        for y in range(2,6):
+            for x in range(0,8):
+                self.board[x][y].append(0)
+        automated = False
 
 #empty the board and reset the counter
     def empty_board(self):
         for y in range (0,8):
             for x in range (0,8):
-                self.board[x][y] = 0
+                self.board[x][y] = []
         self.counter = 0
 
 # give a score to the current status of the board
@@ -227,44 +270,55 @@ class game:
         for y in range(0,8):
             for x in range(0,8):
                 square_content = self.read([x,y])
-                try:
-                    if square_content.piece_color == w:
+                if square_content == 0: pass
+                else:
+                    if square_content.piece_color == W:
                         board_value += square_content.piece_value
-                    if square_content.piece_color == b:
+                    if square_content.piece_color == B:
                         board_value -= square_content.piece_value
 #0 is equally good for balck and white, <0 is good for black, >0 is good for
 #white
-                except:
-                    if square_content == 0: pass
-                    else: raise AssertionError("Unexpected value at "
-                                               +str([x,y])+
-                                               ": "+str(square_content))
         return board_value
-
-#removes a piece form the board
-    def remove_piece(self,coordinate_list):
-        x,y = coordinate_list[0],coordinate_list[1]
-        self.board[x][y] = 0
 
 #take a position, read its content, move the piece on the board to the
 #specified position and update the piece internal memory
-    def move_piece(self,starting_position,arriving_position):
+    def move_piece(self,list_of_positions):
+        starting_position,arriving_position = list_of_positions[0],list_of_positions[1]
+#it is called with the format [[x,y][x,y]]
+        starting_x,starting_y = starting_position[0],starting_position[1]
+        arriving_x,arriving_y = arriving_position[0],arriving_position[1]
         my_piece = self.read(starting_position)
         my_color = my_piece.piece_color
         piece_type = my_piece.name
         if automated == False:
-            my_piece.calculate_piece_possibles()
 #refresh the available moves
-            possible_moves = my_piece.piece_possibles
-            assert arriving_position in possible_moves
+            my_piece.update_piece_possibles()
+            assert arriving_position in my_piece.possibles
 # assert move validity if the human is playing
-        self.remove_piece(starting_position)
-        self.add_piece(piece_type,my_color,arriving_position)
-#update the board removing a piece from the starting position and adding it at
-#the destination, if an opponent piece is captured it is just sovrascribed, no
-#need to explicitly destroy it
+        self.board[arriving_x][arriving_y].append(my_piece)
+        self.board[starting_x][starting_y].append(0)
+#this removes the piece from the starting position and puts it in the new
+#position
+        for y in range(0,8):
+            for x in range(0,8):
+                position = [x,y]
+                if (position != starting_position and
+                    position != arriving_position):
+                    self.board[x][y].append(self.board[x][y][-1])
+#all square lists must have the same lenght, this adds an element to non-moved
+#squares
         self.counter += 1
 # increment counter variable by 1
+        self.read(arriving_position).update_position(arriving_position)
+#update the internal position variable for the piece
+
+#eliminate the last element on the list for each square
+    def undo_move(self):
+        for y in range(0,8):
+            for x in range(0,8):
+                self.board[x][y].pop()
+        self.counter -= 1
+#by default pop() eliminates the last element
 
 #return the content of a cell
     def read(self,coordinate_list):
@@ -272,77 +326,99 @@ class game:
             x,y = coordinate_list[0],coordinate_list[1]
             assert(x>=0 and y>=0)
 #otherways it calls non-existent squares from the end of the list
-            return self.board [x][y]
-        except: return out_of_range
+            square_content = self.board[x][y][-1]
+            return square_content
+        except:
+            return out_of_range
+#this is useful for handling exceptions
 
 #human-readable representation of the checkboard
     def show_board(self):
-       # │ ─┌ ┐ └ ┘ ┬ ┴ ├ ┤ ┼
+        global automated
+        automated = True
         print("  ┌───┬───┬───┬───┬───┬───┬───┬───┐")
-        for y in range(7,-1,-1):
+        if self.who_plays() == W:
+            reverse = False
+        elif self.who_plays() == B:
+            reverse = True
+#reverse the board if black is playing
+        if reverse:
+            y_range = range(0,8)
+            x_range = range(7,-1,-1)
+        elif not reverse:
+            y_range = range(7,-1,-1)
+            x_range = range(0,8)
+        for y in y_range:
 #the 3rd argument is the incremnent of the range, which has to go backwards in
 #order to put white at the bottom
             print(str(y+1),end="")
-            for x in range(0,8):
-                try:
-                    if showing_possibles == False:
+            for x in x_range:
+                if showing_possibles == False:
 #default value
-                        print(" │ ",end="")
+                    print(" │ ",end="")
 #| symbol preceding the element, without \n (end="")
-                        if self.board[x][y].piece_color == w:
-                            print(self.board[x][y].symbol[0],end="")
-                        elif self.board[x][y].piece_color == b:
-                            print(self.board[x][y].symbol[1],end="")
+                    if self.read([x,y]) == 0: print(" ",end="")
+                    elif self.read([x,y]).piece_color == W:
+                        print(self.read([x,y]).symbol[0],end="")
+                    elif self.read([x,y]).piece_color == B:
+                        print(self.read([x,y]).symbol[1],end="")
 #the first character of the .symbol string is for white, the second for black
-                    elif showing_possibles == True:
+                elif showing_possibles == True:
 #True only if the function is called by piece.show_piece_possibles()
-                        if [x,y] in showing_moves:
+                    if [x,y] in showing_moves:
 #if the current position is among the ones in which the current piece can move
-                            if self.board[x][y] == 0:
+                        if self.read([x,y]) == 0:
 #if the square is empty the formatting is the same as always because we will
 #add just an x
-                                print(" │ ",end="")
-                            else:
-                                print(" │",end="")
+                            print(" │ ",end="")
+                        else:
+                            print(" │",end="")
 #if the square is already occupied i want to print a space less, because i will
 #print both an x an the occupying piece
-                                if self.board[x][y].piece_color == w:
-                                    print(self.board[x][y].symbol[0],end="")
-                                elif self.board[x][y].piece_color == b:
-                                    print(self.board[x][y].symbol[1],end="")
+                            if self.read([x,y]).piece_color == W:
+                                print(self.read([x,y]).symbol[0],end="")
+                            elif self.read([x,y]).piece_color == B:
+                                print(self.read([x,y]).symbol[1],end="")
 #the usual if cycle for printing the right color
-                            print("x",end="")
+                        print("x",end="")
 #print x in the treathened squares
-                        else:
+                    else:
 #if current square is not treathened by current piece, do the usual cycle
-                            print(" │ ",end="")
-                            if self.board[x][y].piece_color == w:
-                                print(self.board[x][y].symbol[0],end="")
-                            elif self.board[x][y].piece_color == b:
-                                print(self.board[x][y].symbol[1],end="")
-                except: print(" ",end="")
+                        print(" │ ",end="")
+                        if self.read([x,y]) == 0: print(" ",end="")
+                        elif self.read([x,y]).piece_color == W:
+                            print(self.read([x,y]).symbol[0],end="")
+                        elif self.read([x,y]).piece_color == B:
+                            print(self.read([x,y]).symbol[1],end="")
 #leave a blank space for empty cells, which raise an error
-
             print(" │ ")
 #print the row number at the end of the row itself, and prints a different row
 #for the last iteration
-            if y>0: print("  ├───┼───┼───┼───┼───┼───┼───┼───┤")
-            elif y==0: print("  └───┴───┴───┴───┴───┴───┴───┴───┘")
+            if reverse:
+                if y<7: print("  ├───┼───┼───┼───┼───┼───┼───┼───┤")
+                elif y==7: print("  └───┴───┴───┴───┴───┴───┴───┴───┘")
+            elif not reverse:
+                if y>0: print("  ├───┼───┼───┼───┼───┼───┼───┼───┤")
+                elif y==0: print("  └───┴───┴───┴───┴───┴───┴───┴───┘")
 #add a delimiting line after each row
-        print ("    A   B   C   D   E   F   G   H")
+        if reverse:
+            print ("    H   G   F   E   D   C   B   A")
+        elif not reverse:
+            print ("    A   B   C   D   E   F   G   H")
 #a representation of the columns, written under them
+        automated = False
 
 #return white or balck depending on who must move
     def who_plays(self):
         if self.counter % 2 == 0:
 #% is the remainder operator
-            return w
+            return W
         elif self.counter % 2 == 1:
-            return b
+            return B
 
 #return all the legal moves for a given player
     def player_possibles(self):
-        self.player_possibles = []
+        player_possibles = []
         player_color = self.who_plays()
         movable_pieces = []
         for y in range(0,8):
@@ -351,25 +427,25 @@ class game:
                 if current_square != 0:
                     if current_square.piece_color == player_color:
 #a move is legal only from a square where I have a piece
-                        current_square.calculate_piece_possibles()
-                        for destination in current_square.piece_possibles:
+                        current_square.update_piece_possibles()
+                        for destination in current_square.possibles:
                             move =  [[x,y],destination]
-                            self.player_possibles.append(move)
+                            player_possibles.append(move)
 #create a list of moves
 #a move is itself a list [starting_position,arriving_position]
 #a position is a list [x,y]
-        return self.player_possibles
+        return player_possibles
 
-########## All the classes for the different figures of the game
+#each kind of piece has its class
 #this class is common to all pieces and sets shared properties
 class piece:
     def give_color(self,color):
         self.piece_color = color
-        if self.piece_color == w:
+        if self.piece_color == W:
 #the direction variables is used for keeping track of the forward
 #direction, mainly for pawns
             self.direction = 1
-        elif self.piece_color == b:
+        elif self.piece_color == B:
             self.direction = -1
         else:
             raise AssertionError("The color variable at square " +
@@ -392,7 +468,8 @@ class piece:
         global showing_moves
 #these globals are used by the game.show_board() function
         showing_possibles = True
-        showing_moves = self.calculate_piece_possibles()
+        self.update_piece_possibles()
+        showing_moves = self.possibles
         current_game.show_board()
         showing_possibles = False
         showing_moves = []
@@ -429,8 +506,8 @@ class long_range_piece(piece):
         return  [final_x,final_y]
 
 #take a list of moves and calculate the ending positions accordingly
-    def calculate_piece_possibles(self):
-        self.piece_possibles = []
+    def update_piece_possibles(self):
+        self.possibles = []
         for move in self.all_moves:
 #loop trough all the moves
             for direction in [1,-1]:
@@ -442,22 +519,19 @@ class long_range_piece(piece):
                     directional_length = length*direction
                     my_move = move(directional_length)
                     new_square_content = current_game.read(my_move)
-                    try:
-                        assert new_square_content == 0
+                    if new_square_content == out_of_range: break
+                    elif new_square_content == 0:
 #avoid adding to the list squares not existing or not empty
-                        self.piece_possibles.append(my_move)
-                    except:
-                        try:
-                            assert (new_square_content.piece_color ==
-                                   opposite_color(self.piece_color))
-                            self.piece_possibles.append(my_move)
-                            break
+                        self.possibles.append(my_move)
+                    elif (new_square_content.piece_color ==
+                    opposite_color(self.piece_color)):
+                        self.possibles.append(my_move)
+                        break
 #even if there is a piece i can move and eat it if it's not mine, but then I
 #have to break because i can eat only the first one that I encounter
-                        except: break
+                    else: break
 #the first positions calculated are the nearest ones, breaking the loop avoids
 #wasting time in calculating impossible positions
-        return self.piece_possibles
 
 class pawn(piece):
 # create human readable name variable for the current piece
@@ -476,11 +550,10 @@ class pawn(piece):
         final_y = y + 1*self.direction
         my_move = [final_x,final_y]
         new_square_content = current_game.read(my_move)
-        try:
-            assert new_square_content == 0
+        if new_square_content == 0:
             self.move_is_allowed = True
 #can move in this direction only if there is an empty square
-        except: self.move_is_allowed = False
+        else: self.move_is_allowed = False
         return my_move
 
 #eat right
@@ -490,12 +563,13 @@ class pawn(piece):
         final_y = y + 1*self.direction
         my_move = [final_x,final_y]
         new_square_content = current_game.read(my_move)
-        try:
-            assert (new_square_content.piece_color ==
-                   opposite_color(self.piece_color))
+        if new_square_content in (0,out_of_range):
+            self.move_is_allowed = False
+        elif (new_square_content.piece_color ==
+        opposite_color(self.piece_color)):
 #can move in this direction only if there is an opponent
             self.move_is_allowed = True
-        except: self.move_is_allowed = False
+        else: self.move_is_allowed = False
         return my_move
 
 #eat left
@@ -505,12 +579,13 @@ class pawn(piece):
         final_y = y + 1*self.direction
         my_move = [final_x,final_y]
         new_square_content = current_game.read(my_move)
-        try:
-            assert (new_square_content.piece_color ==
-                   opposite_color(self.piece_color))
+        if new_square_content in (0,out_of_range):
+            self.move_is_allowed = False
+        elif (new_square_content.piece_color ==
+        opposite_color(self.piece_color)):
 #can move in this direction only if there is an opponent
             self.move_is_allowed = True
-        except: self.move_is_allowed = False
+        else: self.move_is_allowed = False
         return my_move
 
 #special moves
@@ -521,18 +596,16 @@ class pawn(piece):
    #     return xy_to_letter(final_x,final_y)
 
 # return a list of possible ending positions using the coded moves
-    def calculate_piece_possibles(self):
-        self.piece_possibles = []
+    def update_piece_possibles(self):
+        self.possibles = []
         for move in self.all_moves:
             my_move = move()
             new_square_content = current_game.read(my_move)
-            try:
-                assert self.move_is_allowed == True
+            if self.move_is_allowed == True:
 #the conditions for each move are coded in the moves themselves, because of
 #their complexity
-                self.piece_possibles.append(my_move)
-            except: pass
-        return self.piece_possibles
+                self.possibles.append(my_move)
+            else: pass
 
 
 class rook(long_range_piece):
@@ -549,8 +622,8 @@ class knight(piece):
         self.symbol = "♘♞"
         self.piece_value = 3
 
-    def calculate_piece_possibles(self):
-        self.piece_possibles = []
+    def update_piece_possibles(self):
+        self.possibles = []
         x,y = self.position[0],self.position[1]
         self.all_moves = ()
         for a in (1,-1):
@@ -564,18 +637,14 @@ class knight(piece):
                     final_y = y + y_increment
                     my_move = [final_x,final_y]
                     new_square_content = current_game.read(my_move)
-                    try:
-                        assert new_square_content == 0
+                    if new_square_content == out_of_range: pass
+                    elif (new_square_content == 0 or
+                    (new_square_content.piece_color ==
+                    opposite_color(self.piece_color))):
 #avoid adding to the list squares not existing or not empty
-                        self.piece_possibles.append(my_move)
-                    except:
-                        try:
-                            assert (new_square_content.piece_color ==
-                                   opposite_color(self.piece_color))
-                            self.piece_possibles.append(my_move)
+                         self.possibles.append(my_move)
 #even if there is a piece i can move and eat it if it's not mine
-                        except: pass
-        return self.piece_possibles
+                    else: pass
 
 
 class bishop(long_range_piece):
@@ -590,7 +659,8 @@ class queen(long_range_piece):
     def __init__(self):
         self.name = q
         self.symbol = "♕♛"
-        self.all_moves = (self.h_slide,self.v_slide,self.ru_slide,self.lu_slide)
+        self.all_moves = (self.h_slide,self.v_slide,self.ru_slide,
+                          self.lu_slide)
 #queen moves in all directions
         self.piece_value = 8
 
@@ -653,62 +723,108 @@ class king(piece):
         return  [final_x,final_y]
 
 # return a list of possible ending positions using the coded moves
-    def calculate_piece_possibles(self):
-        self.piece_possibles = []
+    def update_piece_possibles(self):
+        self.possibles = []
         for move in self.all_moves:
             my_move = move()
             new_square_content = current_game.read(my_move)
-            try:
-                assert new_square_content == 0
+            if new_square_content == out_of_range: pass
+            elif (new_square_content == 0 or
+            (new_square_content.piece_color ==
+            opposite_color(self.piece_color))):
 #avoid adding to the list squares not existing or not empty
-                self.piece_possibles.append(my_move)
-            except:
-                try:
-                    assert (new_square_content.piece_color ==
-                            opposite_color(self.piece_color))
-                    self.piece_possibles.append(my_move)
+                self.possibles.append(my_move)
 #even if there is a piece i can move and eat it if it's not mine
-                except: pass
-        return self.piece_possibles
+            else: pass
+
+# Print splash screen
+# Main loop:
+    # Ask for user input
+    # Process the input and do one of the following:
+        # Select AI alogrithm
+            # Algorithm selection loop
+        # Start a new game:
+            # Control loop
+        # List saved games and allows user to resume one:
+            # Control loop
+        # Quit
+        # Print an error and restarts the main loop
+
+# Control loop:
+    # Has AI algorithm been selected?
+        # YES:
+            # Continue the control loop
+        # NO:
+            # Print an error
+            # Enter algorithm selection loop
+    # Ask for user input
+    # Process the input and do one of the following:
+        # Print current checkboard status
+        # Operate a move on the board:
+            # Game loop
+        # Return to main loop
+        # Print an error and restart the control loop
+
+# Algorithm selection loop:
+    # Ask for user input
+    # Process the input and do one of the following:
+        # Select the choosen algorthm
+        # Print an error and restart the algorthm selection loop
+        # Return to main menu
+
+# Game loop:
+    # Check if the game has ended:
+        # Print result
+        # return to control loop
+    # Check who can move and enter the appropriate loop
+        # User move loop
+       # AI move loop
+
+# User moves loop:
+    # Ask the user to insert a move or quit to control loop
+    # Input is converted in the internal representation
+    # Assert move validity
+    # Operate the move on the board
+    # Return to game loop
+
+#move
+game()
+#create a game object
+current_game.initialise()
+#put pieces on the board
+while True:
+#an infinite loop which cycles through the 2 players
+    current_game.show_board()
+    current_game.move_piece(AI("minmax"))
+    current_game.show_board()
+    while True:
+#stay here until I do not get a valid move as input
+        my_input = input("Which square do you want to select?")
+        try:
+            assert my_input in all_squares
+            starting_position = letter_to_xy(my_input)
+            user_selected_square = current_game.read(starting_position)
+            user_selected_square.update_piece_possibles()
+            assert user_selected_square != 0
+            assert user_selected_square.piece_color == current_game.who_plays()
+            assert user_selected_square.possibles != []
+            break
+        except AssertionError: print(my_input+" is not a valide square")
+    user_selected_square.show_piece_possibles()
+    while True:
+#same as above, but for the destination
+        my_input = input("Where do you want to move this piece?")
+        try:
+            assert my_input in all_squares
+            arriving_position = letter_to_xy(my_input)
+            arriving_position_content = current_game.read(arriving_position)
+            assert arriving_position in user_selected_square.possibles
+            break
+        except AssertionError: print(my_input+" is not a valide square")
+    current_game.move_piece([starting_position,arriving_position])
+#move the piece as the human said and restart the loop, the AI plays
 
 ###############################################################################
 ###############################################################################
 ###############################################################################
 # Test code area
-game1 = game()
-current_game.initialise()
-current_game.show_board()
-current_game.player_possibles()
-#current_game.empty_board()
-#current_game.show_board()
-#current_game.add_piece(c,w,[6,2])
-#current_piece = current_game.board[6][2]
-#current_piece.show_piece_possibles()
-#print("\nboard evaluation: "+str(current_game.evaluate_board()))
-#print(current_piece.position)
-#print(current_piece.name)
-#current_piece.calculate_piece_possibles()
-#moves = []
-#for i in current_piece.piece_possibles:
-#    moves.append(xy_to_letter(i))
-#print (moves)
-#current_game.move_piece([4,4],[7,7])
-#current_game.show_board()
-#current_piece = current_game.board[7][7]
-#print(current_piece.position)
-#print(current_piece.name)
-#current_piece.calculate_piece_possibles()
-#moves = []
-#for i in current_piece.piece_possibles:
-#    moves.append(xy_to_letter(i))
-#print (moves)
-#print(game1.board[0][0].position)
-#print(game1.board[0][0].piece_possibles())
-#for x in range(0,8):
-#    for y in range(0,8):
-#        print(game1.board[x][y])
-#        try:
-#            print(game1.board[x][y].position)
-#            print(game1.board[x][y].color)
-#        except:
-#            print("empty cell")
