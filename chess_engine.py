@@ -14,11 +14,10 @@
     # Maybe could add an option for specifying a particular pieces arrangement
     # Maybe could add an option for playing human-human, human-AI or AI-AI,
     # current only human-AI
-    # Will add Random, MinMax and alfa/beta pruning AI algorthms
     # perfect evaluate_board function
-    # add special moves
-    # add algorithms
-    # add UI
+    # add special moves: pawn promotion, en passant
+    # add algorithms: a/b
+    # add possibility to give check!
 
 letter_xy_table = {"A":0,"B":1,"C":2,"D":3,"E":4,"F":5,"G":6,"H":7}
 xy_letter_table = {0:"A",1:"B",2:"C",3:"D",4:"E",5:"F",6:"G",7:"H"}
@@ -110,7 +109,7 @@ def AI(algorithm):
     if algorithm == "greedy":
         selected_move = greedy()
     elif algorithm == "minmax":
-        selected_move = minmax(3)[1]
+        selected_move = minmax(2)[1]
 #depth is fixed to a value that takes a reasonable amount of time to run
     automated = False
     return selected_move
@@ -185,7 +184,7 @@ class game:
         for y in range (0,8):
             self.row = []
             for x in range (0,8):
-                self.row.append([0])
+                self.row.append([])
             self.board.append(self.row)
 #create a counter variable with value 0
         self.counter = 0
@@ -221,8 +220,12 @@ class game:
                     if len(self.board[x][y])>len(self.board[my_x][my_y]):
 #for each square, if it is shorter than the one where I added the piece, add an
 #element to it
-                        self.board[my_x][my_y].append(self.board
-                                                      [my_x][my_y][-1])
+                        if self.board[my_x][my_y] == []:
+                            self.board[my_x][my_y].append(0)
+                        else:
+                            self.board[my_x][my_y].append(self.board
+                                                          ([my_x][my_y][-1]))
+                            print("hey")
 
 
 #place all pieces in the starting position on the board, creating piece objects
@@ -257,13 +260,6 @@ class game:
                 self.board[x][y].append(0)
         automated = False
 
-#empty the board and reset the counter
-    def empty_board(self):
-        for y in range (0,8):
-            for x in range (0,8):
-                self.board[x][y] = []
-        self.counter = 0
-
 # give a score to the current status of the board
     def evaluate_board(self):
         board_value = 0
@@ -283,6 +279,8 @@ class game:
 #take a position, read its content, move the piece on the board to the
 #specified position and update the piece internal memory
     def move_piece(self,list_of_positions):
+        rook_castled_moving_positions = ()
+#reset a variable called when castling
         starting_position,arriving_position = list_of_positions[0],list_of_positions[1]
 #it is called with the format [[x,y][x,y]]
         starting_x,starting_y = starting_position[0],starting_position[1]
@@ -295,6 +293,23 @@ class game:
             my_piece.update_piece_possibles()
             assert arriving_position in my_piece.possibles
 # assert move validity if the human is playing
+        if piece_type == k:
+            if (abs(starting_x - arriving_x) == 2):
+#this means that I am castling, the king is moved normally but here I have to
+#move the rook
+                if (starting_x - arriving_x == 2):
+                    rook_starting_x = 0
+                    rook_arriving_x = 3
+                elif (starting_x - arriving_x == -2):
+                    rook_starting_x = 7
+                    rook_arriving_x = 5
+                rook_starting_position = [rook_starting_x,starting_y]
+                rook_arriving_position = [rook_arriving_x,starting_y]
+                my_rook = self.read(rook_starting_position)
+                self.board[rook_starting_x][starting_y].append(0)
+                self.board[rook_arriving_x][starting_y].append(my_rook)
+                rook_castled_moving_positions = (rook_starting_position,
+                                                 rook_arriving_position)
         self.board[arriving_x][arriving_y].append(my_piece)
         self.board[starting_x][starting_y].append(0)
 #this removes the piece from the starting position and puts it in the new
@@ -303,7 +318,8 @@ class game:
             for x in range(0,8):
                 position = [x,y]
                 if (position != starting_position and
-                    position != arriving_position):
+                    position != arriving_position and
+                    not (position in rook_castled_moving_positions)):
                     self.board[x][y].append(self.board[x][y][-1])
 #all square lists must have the same lenght, this adds an element to non-moved
 #squares
@@ -335,6 +351,9 @@ class game:
 #human-readable representation of the checkboard
     def show_board(self):
         global automated
+        if self.board[0][0] == []:
+            print("The board is empty")
+            return
         automated = True
         print("  ┌───┬───┬───┬───┬───┬───┬───┬───┐")
         if self.who_plays() == W:
@@ -455,6 +474,8 @@ class piece:
 #stores the position in [x,y] format
     def update_position(self,coordinate_list):
         self.position = coordinate_list
+        self.x,self.y = coordinate_list[0],coordinate_list[1]
+        self.square = current_game.board[self.x][self.y]
 
 #human readable form of the previous function
     def read_position_letteral(self):
@@ -474,35 +495,35 @@ class piece:
         showing_possibles = False
         showing_moves = []
 
+#return True if the piece has never moved
+    def did_not_move(self):
+        return all(content == self.square[-1] for content in self.square)
+
 #this class comprehends pieces capable of moving for a variable amount of
 #squares in a given direction
 class long_range_piece(piece):
 #horizontal sliding
     def h_slide(self,directional_length):
-        x,y = self.position[0],self.position[1]
-        final_x = x + directional_length
-        final_y = y
+        final_x = self.x + directional_length
+        final_y = self.y
         return  [final_x,final_y]
 
 #vertical sliding
     def v_slide(self,directional_length):
-        x,y = self.position[0],self.position[1]
-        final_x = x
-        final_y = y + directional_length
+        final_x = self.x
+        final_y = self.y + directional_length
         return  [final_x,final_y]
 
 #left-down/right-up sliding
     def ru_slide(self,directional_length):
-        x,y = self.position[0],self.position[1]
-        final_x = x + directional_length
-        final_y = y + directional_length
+        final_x = self.x + directional_length
+        final_y = self.y + directional_length
         return  [final_x,final_y]
 
 #right-down/left-up sliding
     def lu_slide(self,directional_length):
-        x,y = self.position[0],self.position[1]
-        final_x = x - directional_length
-        final_y = y + directional_length
+        final_x = self.x - directional_length
+        final_y = self.y + directional_length
         return  [final_x,final_y]
 
 #take a list of moves and calculate the ending positions accordingly
@@ -545,9 +566,8 @@ class pawn(piece):
 #list of all allowed moves
 #simple advancement by 1
     def move_u1(self):
-        x,y = self.position[0],self.position[1]
-        final_x = x
-        final_y = y + 1*self.direction
+        final_x = self.x
+        final_y = self.y + 1*self.direction
         my_move = [final_x,final_y]
         new_square_content = current_game.read(my_move)
         if new_square_content == 0:
@@ -558,9 +578,8 @@ class pawn(piece):
 
 #eat right
     def move_ur(self):
-        x,y = self.position[0],self.position[1]
-        final_x = x + 1*self.direction
-        final_y = y + 1*self.direction
+        final_x = self.x + 1*self.direction
+        final_y = self.y + 1*self.direction
         my_move = [final_x,final_y]
         new_square_content = current_game.read(my_move)
         if new_square_content in (0,out_of_range):
@@ -574,9 +593,8 @@ class pawn(piece):
 
 #eat left
     def move_ul(self):
-        x,y = self.position[0],self.position[1]
-        final_x = x - 1*self.direction
-        final_y = y + 1*self.direction
+        final_x = self.x - 1*self.direction
+        final_y = self.y + 1*self.direction
         my_move = [final_x,final_y]
         new_square_content = current_game.read(my_move)
         if new_square_content in (0,out_of_range):
@@ -601,7 +619,7 @@ class pawn(piece):
         for move in self.all_moves:
             my_move = move()
             new_square_content = current_game.read(my_move)
-            if self.move_is_allowed == True:
+            if self.move_is_allowed:
 #the conditions for each move are coded in the moves themselves, because of
 #their complexity
                 self.possibles.append(my_move)
@@ -616,6 +634,7 @@ class rook(long_range_piece):
 #rook moves straight
         self.piece_value = 5
 
+
 class knight(piece):
     def __init__(self):
         self.name = c
@@ -624,7 +643,6 @@ class knight(piece):
 
     def update_piece_possibles(self):
         self.possibles = []
-        x,y = self.position[0],self.position[1]
         self.all_moves = ()
         for a in (1,-1):
             for b in (2,-2):
@@ -633,8 +651,8 @@ class knight(piece):
                     x_increment,y_increment = increment[i],increment[1-i]
 #possible increments of both x and y are 2 and 1, in both directions
 #if x is 1 y is 3, and vice-versa
-                    final_x = x + x_increment
-                    final_y = y + y_increment
+                    final_x = self.x + x_increment
+                    final_y = self.y + y_increment
                     my_move = [final_x,final_y]
                     new_square_content = current_game.read(my_move)
                     if new_square_content == out_of_range: pass
@@ -671,55 +689,58 @@ class king(piece):
         self.piece_possibles = []
         self.all_moves = (self.move_d,self.move_l,self.move_r,self.move_u,
                           self.move_dl,self.move_dr,self.move_ul,self.move_ur)
+        self.castle_moves = (self.king_castle,self.queen_castle)
         self.piece_value = 1000
 
 #list of all allowed moves (up,down,left,right and the 4 diagonals)
     def move_u(self):
-        x,y = self.position[0],self.position[1]
-        final_x = x
-        final_y = y + 1
+        final_x = self.x
+        final_y = self.y + 1
         return  [final_x,final_y]
 
     def move_d(self):
-        x,y = self.position[0],self.position[1]
-        final_x = x
-        final_y = y - 1
+        final_x = self.x
+        final_y = self.y - 1
         return  [final_x,final_y]
 
     def move_l(self):
-        x,y = self.position[0],self.position[1]
-        final_x = x - 1
-        final_y = y
+        final_x = self.x - 1
+        final_y = self.y
         return  [final_x,final_y]
 
     def move_r(self):
-        x,y = self.position[0],self.position[1]
-        final_x = x + 1
-        final_y = y
+        final_x = self.x + 1
+        final_y = self.y
         return  [final_x,final_y]
 
     def move_ul(self):
-        x,y = self.position[0],self.position[1]
-        final_x = x - 1
-        final_y = y + 1
+        final_x = self.x - 1
+        final_y = self.y + 1
         return  [final_x,final_y]
 
     def move_ur(self):
-        x,y = self.position[0],self.position[1]
-        final_x = x + 1
-        final_y = y + 1
+        final_x = self.x + 1
+        final_y = self.y + 1
         return  [final_x,final_y]
 
     def move_dl(self):
-        x,y = self.position[0],self.position[1]
-        final_x = x - 1
-        final_y = y - 1
+        final_x = self.x - 1
+        final_y = self.y - 1
         return  [final_x,final_y]
 
     def move_dr(self):
-        x,y = self.position[0],self.position[1]
-        final_x = x + 1
-        final_y = y - 1
+        final_x = self.x + 1
+        final_y = self.y - 1
+        return  [final_x,final_y]
+
+    def king_castle(self):
+        final_x = self.x + 2
+        final_y = self.y
+        return  [final_x,final_y]
+
+    def queen_castle(self):
+        final_x = self.x - 2
+        final_y = self.y
         return  [final_x,final_y]
 
 # return a list of possible ending positions using the coded moves
@@ -735,7 +756,31 @@ class king(piece):
 #avoid adding to the list squares not existing or not empty
                 self.possibles.append(my_move)
 #even if there is a piece i can move and eat it if it's not mine
-            else: pass
+        king_allows_castle = ((self.x  == 4) and
+                              ((self.y == 0 and self.piece_color == W) or
+                               (self.y == 7 and self.piece_color == B)) and
+                              self.did_not_move())
+#check if can castle, and in case add the move to piece possibles
+        for move in self.castle_moves:
+            if move == self.king_castle:
+                rook_x = 7
+            elif move == self.queen_castle:
+                rook_x = 0
+            my_rook = current_game.read([rook_x,self.y])
+            rook_allows_castle = ((my_rook != 0) and (my_rook.name == r) and my_rook.did_not_move())
+            there_is_room = (((rook_x == 0) and
+                              all((current_game.read([current_x,self.y]) == 0)
+                                  for current_x in range(self.x-1,rook_x,-1)))
+                             or ((rook_x == 7) and
+                                 all((current_game.read([current_x,self.y]) == 0)
+                                     for current_x in range(self.x+1,rook_x,+1))))
+#to be implemented
+            not_in_check = True
+            self.castle_is_allowed = (king_allows_castle and rook_allows_castle and
+                                 there_is_room and not_in_check)
+            if self.castle_is_allowed:
+                my_move = move()
+                self.possibles.append(my_move)
 
 # Print splash screen
 # Main loop:
@@ -787,44 +832,75 @@ class king(piece):
     # Operate the move on the board
     # Return to game loop
 
-#move
-game()
+#this calls the main game loop
+def play():
+    game()
 #create a game object
-current_game.initialise()
+    current_game.initialise()
 #put pieces on the board
-while True:
+    while True:
 #an infinite loop which cycles through the 2 players
-    current_game.show_board()
-    current_game.move_piece(AI("minmax"))
-    current_game.show_board()
-    while True:
+        current_game.show_board()
+        current_game.move_piece(AI("minmax"))
+        current_game.show_board()
+        while True:
 #stay here until I do not get a valid move as input
-        my_input = input("Which square do you want to select?")
-        try:
-            assert my_input in all_squares
-            starting_position = letter_to_xy(my_input)
-            user_selected_square = current_game.read(starting_position)
-            user_selected_square.update_piece_possibles()
-            assert user_selected_square != 0
-            assert user_selected_square.piece_color == current_game.who_plays()
-            assert user_selected_square.possibles != []
-            break
-        except AssertionError: print(my_input+" is not a valide square")
-    user_selected_square.show_piece_possibles()
-    while True:
+            my_input = input("Which square do you want to select?")
+            try:
+                assert my_input in all_squares
+                starting_position = letter_to_xy(my_input)
+                user_selected_square = current_game.read(starting_position)
+                user_selected_square.update_piece_possibles()
+                assert user_selected_square != 0
+                assert user_selected_square.piece_color == current_game.who_plays()
+                assert user_selected_square.possibles != []
+                break
+            except AssertionError: print(my_input+" is not a valide square")
+        user_selected_square.show_piece_possibles()
+        while True:
 #same as above, but for the destination
-        my_input = input("Where do you want to move this piece?")
-        try:
-            assert my_input in all_squares
-            arriving_position = letter_to_xy(my_input)
-            arriving_position_content = current_game.read(arriving_position)
-            assert arriving_position in user_selected_square.possibles
-            break
-        except AssertionError: print(my_input+" is not a valide square")
-    current_game.move_piece([starting_position,arriving_position])
+            my_input = input("Where do you want to move this piece?")
+            try:
+                assert my_input in all_squares
+                arriving_position = letter_to_xy(my_input)
+                arriving_position_content = current_game.read(arriving_position)
+                assert arriving_position in user_selected_square.possibles
+                break
+            except AssertionError: print(my_input+" is not a valide square")
+        current_game.move_piece([starting_position,arriving_position])
 #move the piece as the human said and restart the loop, the AI plays
 
-###############################################################################
-###############################################################################
-###############################################################################
-# Test code area
+play()
+##current_game.add_piece(k,B,letter_to_xy("E8"))
+##current_game.show_board()
+##current_game.read(letter_to_xy("E8")).castle()
+##current_game.move_piece([letter_to_xy("E8"),letter_to_xy("E7")])
+##current_game.show_board()
+##current_game.read(letter_to_xy("E7")).castle()
+##current_game.move_piece([letter_to_xy("E7"),letter_to_xy("E8")])
+##current_game.show_board()
+##current_game.read(letter_to_xy("E8")).castle()
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
